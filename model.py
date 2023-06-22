@@ -11,7 +11,6 @@ from torch.nn.modules.module import Module
 from torch import FloatTensor
 from torch.nn.parameter import Parameter
 import manifolds
-# from utils.hci_loss import HCIL
 
 class HypClassifier(nn.Module):
     """
@@ -20,22 +19,22 @@ class HypClassifier(nn.Module):
 
     def __init__(self, args):
         super(HypClassifier, self).__init__()
-        self.manifold = getattr(manifolds, args.manifold)()
+        # self.manifold = getattr(manifolds, args.manifold1)()
         self.input_dim = args.gcn_hidden * 4
         self.output_dim = args.num_classes
         self.use_bias = args.bias
-        if self.manifold.name == "Lorentz":         
-            self.cls = ManifoldParameter(self.manifold.random_normal((args.num_classes, self.input_dim), std=1./math.sqrt(self.input_dim)), manifold=self.manifold)
-        else:
-            self.cls = nn.Linear(self.input_dim, self.output_dim)
+        # if self.manifold.name == "Lorentz":         
+        #     self.cls = ManifoldParameter(self.manifold.random_normal((args.num_classes, self.input_dim), std=1./math.sqrt(self.input_dim)), manifold=self.manifold)
+        # else:
+        self.cls = nn.Linear(self.input_dim, self.output_dim)
         if args.bias:
             self.bias = nn.Parameter(torch.zeros(args.num_classes))
 
     def forward(self, x):
-        if self.manifold.name == "Lorentz":      
-            return (2 + 2 * self.manifold.cinner(x, self.cls)) + self.bias
-        else:
-            return self.cls(x)
+        # if self.manifold.name == "Lorentz":      
+        #     return (2 + 2 * self.manifold.cinner(x, self.cls)) + self.bias
+        # else:
+        return self.cls(x)
 
 
 class DistanceAdj(Module):
@@ -60,20 +59,21 @@ class Model(nn.Module):
     def __init__(self, args, flag):
         super(Model, self).__init__()
         self.flag=flag
-        self.manifold = getattr(manifolds, args.manifold)()
-        if self.manifold.name in ['Lorentz', 'Hyperboloid']:
-            args.gcn_in_feat =  args.gcn_in_feat + 1
+        self.args = args
+        # self.manifold = getattr(manifolds, args.manifold1)()
+        # if self.manifold.name in ['Lorentz', 'Lorentzian','Hyperboloid']:
+        #     args.gcn_in_feat =  args.gcn_in_feat + 1
 
         self.disAdj = DistanceAdj()
 
         self.conv1d1 = nn.Conv1d(in_channels=args.c_in_feat, out_channels=args.c_hidden, kernel_size=1, padding=0)
         self.conv1d2 = nn.Conv1d(in_channels=args.c_hidden, out_channels=args.c_out_feat, kernel_size=1, padding=0)
 
-        self.HFSGCN = FHyperGCN(args)
-        self.HTRGCN = FHyperGCN(args)
+        self.HFSGCN1 = FHyperGCN(args, args.model1, args.manifold1)
+        self.HTRGCN1 = FHyperGCN(args, args.model1, args.manifold1)
 
-        self.HFSGCN_ = FHyperGCN(args)
-        self.HTRGCN_ = FHyperGCN(args)
+        self.HFSGCN2 = FHyperGCN(args, args.model2, args.manifold2)
+        self.HTRGCN2 = FHyperGCN(args, args.model2, args.manifold2)
 
         self.dropout = nn.Dropout(args.dropout)
         self.relu = nn.LeakyReLU()
@@ -104,58 +104,69 @@ class Model(nn.Module):
         x = x.permute(0, 2, 1)  # b*t*c
 
         disadj = self.disAdj(x.shape[0], x.shape[1], x.device).to(x.device)
-        proj_x = self.expm(x)
         adj = self.adj2(x, seq_len)
         
-        x1 = self.relu(self.HFSGCN.encode(proj_x, adj))
+        # proj_x = self.expm(x, self.args.manifold1)
+        # proj_y = self.expm(x, self.args.manifold2)
+        proj_x = x
+        proj_y = x
+
+        x1 = self.relu(self.HFSGCN1.encode(proj_x, adj))
         x1 = self.dropout(x1)
-        x2 = self.relu(self.HTRGCN.encode(proj_x, disadj))
+        x2 = self.relu(self.HTRGCN1.encode(proj_x, disadj))
         x2 = self.dropout(x2)
         out_x = torch.cat((x1, x2), 2)
 
 
-        x3 = self.relu(self.HFSGCN_.encode(proj_x, adj))
+        x3 = self.relu(self.HFSGCN2.encode(proj_y, adj))
         x3 = self.dropout(x3)
-        x4 = self.relu(self.HTRGCN_.encode(proj_x, disadj))
+        x4 = self.relu(self.HTRGCN2.encode(proj_y, disadj))
         x4 = self.dropout(x4)
         out_y = torch.cat((x3, x4), 2)
 
+
+        o = torch.zeros_like(out_y)
+        out_y = torch.cat([o[:, :, 0:1], out_y], dim=-1)
+        out_y = self.HFSGCN2.manifold.lorentz_to_poincare(out_y)
         out = torch.cat((out_x, out_y), 2)
-        
-        
-        
+                 
         frame_prob = self.HyperCLS(out).reshape((b, n, -1)).mean(1)
         
-        # if self.flag:
-        #   nor_out = out_x[:batch_size]
-        #   abn_out = out_x[batch_size:]
-        #   nor_score = frame_prob[:batch_size]
-        #   abn_score = frame_prob[batch_size:]
-        #   nor_out_aug = self.encoder_n(nor_out)
-        #   abn_out_aug = self.encoder_a(abn_out)
+        if self.flag=='Train':
+            batch_size = int(b//2)
+            poin_nor_out = out_x[:batch_size]
+            poin_abn_out = out_x[batch_size:]
+            lore_nor_out = out_y[:batch_size]
+            lore_abn_out = out_y[batch_size:]
+            nor_score = frame_prob[:batch_size]
+            abn_score = frame_prob[batch_size:]
+            # nor_out_aug = self.encoder_n(nor_out)
+            # abn_out_aug = self.encoder_a(abn_out)
 
-        #   hypcil_loss = HCIL()     
-        
-        return{
+            return{
+                "frame": frame_prob,
+                'poin_nor_feat': poin_nor_out,
+                'poin_abn_feat': poin_abn_out,
+                'lore_nor_feat': lore_nor_out,
+                'lore_abn_feat': lore_abn_out,
+                'abn_score': abn_score,
+                'nor_score': nor_score
+                }     
+        else:
+             return{
                 "frame": frame_prob
-                # 'triplet_margin': triplet_margin_loss,
-                # 'kl_loss': kl_loss, 
-                # 'distance': distance,
-                # 'A_att': A_att.reshape((b//2, n, -1)).mean(1),
-                # "N_att": N_att.reshape((b//2, n, -1)).mean(1),
-                # "A_Natt": A_Natt.reshape((b//2, n, -1)).mean(1),
-                # "N_Aatt": N_Aatt.reshape((b//2, n, -1)).mean(1)
                 }
 
-    def expm(self, x):
-        if self.manifold.name in ['Lorentz', 'Hyperboloid']:
-            o = torch.zeros_like(x)
-            x = torch.cat([o[:, :, 0:1], x], dim=-1)
-            if self.manifold.name == 'Lorentz':
-                x = self.manifold.expmap0(x)
-            return x
-        else:
-            return x
+    # def expm(self, x, manifold):
+    #     manifold_ = getattr(manifolds, manifold)()
+    #     if manifold_.name in ['Lorentz', 'Hyperboloid']:
+    #         o = torch.zeros_like(x)
+    #         x = torch.cat([o[:, :, 0:1], x], dim=-1)
+    #         if manifold_.name == 'Lorentz':
+    #             x = manifold_.expmap0(x)
+    #         return x
+    #     else:
+    #         return x
 
     def adj(self, x, seq_len):
         soft = nn.Softmax(1)

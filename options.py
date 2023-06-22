@@ -21,8 +21,10 @@ def parse_args():
 
 
     parser.add_argument('--dropout', default=0.6, help='x x')
-    parser.add_argument('--model', default='HGCN', help='which encoder to use, can be any of [Shallow, MLP, HNN, GCN, GAT, HGCN, HyboNet]')
-    parser.add_argument('--manifold', default='PoincareBall', help='which manifold to use, can be any of [Euclidean, Hyperboloid, PoincareBall, Lorentz]')
+    parser.add_argument('--model1', default='HGCN', help='which encoder to use, can be any of [Shallow, MLP, HNN, GCN, LGCN, HGCN, HyboNet]')
+    parser.add_argument('--manifold1', default='PoincareBall', help='which manifold to use, can be any of [Euclidean, Hyperboloid, PoincareBall, Lorentz, Lorentzian]')
+    parser.add_argument('--model2', default='HyboNet', help='which encoder to use, can be any of [Shallow, MLP, HNN, GCN, LGCN, HGCN, HyboNet]')
+    parser.add_argument('--manifold2', default='Lorentz', help='which manifold to use, can be any of [Euclidean, Hyperboloid, PoincareBall, Lorentz, Lorentzian]')
     parser.add_argument('--c', default=None, help='hyperbolic radius, set to None for trainable curvature')
     parser.add_argument('--num-layers', default=2, help='layers of hgcn')
     parser.add_argument('--act', default='relu', help='which activation function to use (or None for no activation)')

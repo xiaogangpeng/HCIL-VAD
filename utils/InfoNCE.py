@@ -56,22 +56,22 @@ def info_nce(query, positive_key, negative_keys=None, temperature=0.1, reduction
         #Cosine between positive pairs
         # positive_logit = torch.sum(query * positive_key, dim=1, keepdim=True)
         #
-        if negative_mode == 'unpaired':
-            # Cosine between all query-negative combinations
-            negative_logits = query @ transpose(negative_keys)
+        # if negative_mode == 'unpaired':
+        #     # Cosine between all query-negative combinations
+        #     negative_logits = query @ transpose(negative_keys)
             
         
         
-        elif negative_mode == 'paired':
-            query = query.unsqueeze(1)
-            negative_logits = query @ transpose(negative_keys)
-            negative_logits = negative_logits.squeeze(1)
+        # elif negative_mode == 'paired':
+        #     query = query.unsqueeze(1)
+        #     negative_logits = query @ transpose(negative_keys)
+        #     negative_logits = negative_logits.squeeze(1)
 
         # print(f"query:{query.shape}  pos: {positive_key.shape}  neg :{negative_keys.shape}")
-        positive_logit = LorentzianDistance(query, positive_key).unsqueeze(-1)
-        negative_logits = LorentzianDistance(query, negative_keys).unsqueeze(-1)
-        # positive_logit = PoincareDistance(query, positive_key, 0.05).unsqueeze(-1)
-        # negative_logits = PoincareDistance(query, negative_keys, 0.05).unsqueeze(-1)
+        # positive_logit = LorentzianDistance(query, positive_key).unsqueeze(-1)
+        # negative_logits = LorentzianDistance(query, negative_keys).unsqueeze(-1)
+        positive_logit = PoincareDistance(query, positive_key, 0.05).unsqueeze(-1)
+        negative_logits = PoincareDistance(query, negative_keys, 0.05).unsqueeze(-1)
         # First index in last dimension are the positive samples
         # print(f"pos : {positive_logit.shape}  neg:{negative_logits.shape}")
         logits = torch.cat([positive_logit, negative_logits], dim=1)

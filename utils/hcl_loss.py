@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from .InfoNCE import InfoNCE
 
 
-def HCIL(abn_logits, nor_logits, seq_len, abn_feat, nor_feat, device, batch_size):
+def HCIL(abn_logits, nor_logits, seq_len, poin_abn_feat, poin_nor_feat, lore_abn_feat, lore_nor_feat, device, batch_size):
     abn_rep = torch.zeros(0).to(device)
     nor_rep = torch.zeros(0).to(device)
     bgd_rep = torch.zeros(0).to(device)

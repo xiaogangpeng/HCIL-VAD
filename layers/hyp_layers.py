@@ -15,7 +15,7 @@ import geoopt.manifolds.stereographic.math as pmath
 MIN_NORM = 1e-15
 
 
-def get_dim_act_curv(args):
+def get_dim_act_curv(args, gcn_in_feat):
     """
     Helper function to get dimension and activation at every layer.
     :param args:
@@ -26,7 +26,7 @@ def get_dim_act_curv(args):
     else:
         act = getattr(F, args.act)
     acts = [act] * (args.num_layers - 1)
-    dims = [args.gcn_in_feat] + ([args.gcn_hidden] * (args.num_layers - 1))
+    dims = [gcn_in_feat] + ([args.gcn_hidden] * (args.num_layers - 1))
 
     # if args.task in ['lp', 'rec']:
     #     dims += [args.dim]

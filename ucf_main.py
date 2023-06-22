@@ -1,14 +1,15 @@
 import pdb
 import numpy as np
 import torch.utils.data as data
-import utils
+import util
 from options import *
 from config import *
 from train import *
 from ucf_test import test
 from model import *
-from utils import Visualizer
+from util import Visualizer
 import os
+import time
 from dataset_loader import *
 from tqdm import tqdm
 
@@ -19,14 +20,15 @@ if __name__ == "__main__":
 
     config = Config(args)
     worker_init_fn = None
-    gpus = [0]
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    gpus = [1]
     torch.cuda.set_device('cuda:{}'.format(gpus[0]))
     if config.seed >= 0:
-        utils.set_seed(config.seed)
+        util.set_seed(config.seed)
         worker_init_fn = np.random.seed(config.seed)
 
     config.len_feature = 1024
-    net = WSAD(config.len_feature, flag = "Train", a_nums = 60, n_nums = 60)
+    net = Model(args, flag="Train")
     net = net.cuda()
 
     normal_train_loader = data.DataLoader(
@@ -49,12 +51,12 @@ if __name__ == "__main__":
     
     best_auc = 0
 
-    criterion = AD_Loss()
+    criterion = torch.nn.BCELoss()
     
     optimizer = torch.optim.Adam(net.parameters(), lr = config.lr[0],
         betas = (0.9, 0.999), weight_decay = 0.00005)
 
-    wind = Visualizer(env = 'UCF_URDMU', port = "2022", use_incoming_socket = False)
+    wind = Visualizer(env = 'UCF_URDMU', port = "8097", use_incoming_socket = False)
     test(net, config, wind, test_loader, test_info, 0)
     for step in tqdm(
             range(1, config.num_iters + 1),
@@ -74,11 +76,11 @@ if __name__ == "__main__":
             test(net, config, wind, test_loader, test_info, step)
             if test_info["auc"][-1] > best_auc:
                 best_auc = test_info["auc"][-1]
-                utils.save_best_record(test_info, 
-                    os.path.join(config.output_path, "ucf_best_record_{}.txt".format(config.seed)))
+                util.save_best_record(test_info, 
+                    os.path.join(config.output_path, "ucf_best_record_{}.txt".format(timestr)))
 
                 torch.save(net.state_dict(), os.path.join(args.model_path, \
-                    "ucf_trans_{}.pkl".format(config.seed)))
+                    "ucf_trans_{}.pkl".format(timestr)))
             if step == config.num_iters:
                 torch.save(net.state_dict(), os.path.join(args.model_path, \
                     "ucf_trans_{}.pkl".format(step)))

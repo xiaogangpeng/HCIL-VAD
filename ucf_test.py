@@ -27,16 +27,16 @@ def test(net, config, wind, test_loader, test_info, step, model_file = None):
             
             
 
-            _data, _label = next(load_iter)
+            inputs, labels, _ = next(load_iter)
             
-            _data = _data.cuda()
-            _label = _label.cuda()
+            inputs = inputs.cuda()
+            labels = labels.cuda()
             
-            res = net(_data)   
+            res = net(inputs, None)   
             a_predict = res["frame"]
             temp_predict = torch.cat([temp_predict, a_predict], dim=0)
             if (i + 1) % 10 == 0 :
-                cls_label.append(int(_label))
+                cls_label.append(int(labels))
                 a_predict = temp_predict.mean(0).cpu().numpy()
                 
                 cls_pre.append(1 if a_predict.max()>0.5 else 0)          
