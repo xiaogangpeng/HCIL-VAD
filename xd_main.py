@@ -20,6 +20,9 @@ if __name__ == "__main__":
     config = Config(args)
     worker_init_fn = None
     timestr = time.strftime("%Y%m%d-%H%M%S")
+
+    gpu_idx = args.gpu
+    torch.cuda.set_device('cuda:{}'.format(gpu_idx))
    
     if config.seed >= 0:
         util.set_seed(config.seed)
@@ -69,17 +72,17 @@ if __name__ == "__main__":
 
         if (step - 1) % len(abnormal_train_loader) == 0:
             abnormal_loader_iter = iter(abnormal_train_loader)
-        train(net, normal_loader_iter,abnormal_loader_iter, optimizer, criterion, wind, step)
+        train(net, normal_loader_iter,abnormal_loader_iter, optimizer, criterion, wind, step, args)
         if step % 10 == 0 and step > 10:
             test(net, config, wind, test_loader, test_info, step)
             if test_info["ap"][-1] > best_auc:
                 best_auc = test_info["ap"][-1]
 
                 util.save_best_record(test_info,
-                    os.path.join(config.output_path, "xd_best_record_{}.txt".format(timestr)))
+                    os.path.join(config.output_path, "xd_best_record_{}.txt".format(args.lamda)))
 
                 torch.save(net.state_dict(), os.path.join(args.model_path, \
-                    "xd_trans_{}.pkl".format(timestr)))
+                    "xd_trans_{}.pkl".format(args.lamda)))
             if step == config.num_iters:
                 torch.save(net.state_dict(), os.path.join(args.model_path, \
                     "xd_trans_{}.pkl".format(step)))

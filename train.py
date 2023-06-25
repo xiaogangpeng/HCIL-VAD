@@ -131,7 +131,7 @@ class HCIL(nn.Module):
 criterion = torch.nn.BCELoss()
 HCIL_Loss = HCIL()
 
-def train(net, normal_loader, abnormal_loader, optimizer, criterion, wind, index):
+def train(net, normal_loader, abnormal_loader, optimizer, criterion, wind, index, args):
     loss = {}
     net.train()
     net.flag = "Train"
@@ -157,7 +157,7 @@ def train(net, normal_loader, abnormal_loader, optimizer, criterion, wind, index
                           inputs.device
                           )
 
-    cost = mil_loss + 0.05 * hcil_loss
+    cost = mil_loss + args.lamda * hcil_loss
 
     # cost = mil_loss
     

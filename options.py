@@ -5,6 +5,8 @@ import os
 def parse_args():
     descript = 'Pytorch Implementation of UR-DMU'
     parser = argparse.ArgumentParser(description = descript)
+    parser.add_argument('--gpu', type=int, default=0, help='number of class')
+
     parser.add_argument('--output_path', type = str, default = 'outputs/')
     parser.add_argument('--root_dir', type = str, default = 'outputs/')
     parser.add_argument('--log_path', type = str, default = 'logs/')
@@ -37,7 +39,7 @@ def parse_args():
     parser.add_argument('--c-in-feat', type=int, default=1024, help='input size of feature for HGCN (default: 2048)')
     parser.add_argument('--c-hidden', type=int, default=512, help='embedding dimension')
     parser.add_argument('--c-out-feat', type=int, default=128, help='input size of feature for HGCN (default: 2048)')
-
+    parser.add_argument('--lamda', type=float, default=0.05, help='input size of feature for HGCN (default: 2048)')
     return init_args(parser.parse_args())
 
 
