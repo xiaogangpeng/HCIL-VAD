@@ -21,8 +21,9 @@ if __name__ == "__main__":
     worker_init_fn = None
     timestr = time.strftime("%Y%m%d-%H%M%S")
 
-    gpu_idx = args.gpu
+    gpu_idx = args.cuda
     torch.cuda.set_device('cuda:{}'.format(gpu_idx))
+    args.device = 'cuda:' + str(gpu_idx) if int(gpu_idx) >= 0 else 'cpu'
    
     if config.seed >= 0:
         util.set_seed(config.seed)
@@ -79,10 +80,10 @@ if __name__ == "__main__":
                 best_auc = test_info["ap"][-1]
 
                 util.save_best_record(test_info,
-                    os.path.join(config.output_path, "xd_best_record_{}.txt".format(args.lamda)))
+                    os.path.join(config.output_path, "xd_best_record_{}={}.txt".format('lamda', args.lamda)))
 
                 torch.save(net.state_dict(), os.path.join(args.model_path, \
-                    "xd_trans_{}.pkl".format(args.lamda)))
+                    "xd_trans_{}={}.pkl".format('lamda', args.lamda)))
             if step == config.num_iters:
                 torch.save(net.state_dict(), os.path.join(args.model_path, \
                     "xd_trans_{}.pkl".format(step)))

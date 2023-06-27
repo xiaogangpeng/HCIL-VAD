@@ -66,12 +66,13 @@ def info_nce(query, positive_key, negative_keys=None, temperature=0.1, reduction
         #     query = query.unsqueeze(1)
         #     negative_logits = query @ transpose(negative_keys)
         #     negative_logits = negative_logits.squeeze(1)
-
         # print(f"query:{query.shape}  pos: {positive_key.shape}  neg :{negative_keys.shape}")
         # positive_logit = LorentzianDistance(query, positive_key).unsqueeze(-1)
         # negative_logits = LorentzianDistance(query, negative_keys).unsqueeze(-1)
-        positive_logit = PoincareDistance(query, positive_key, 0.05).unsqueeze(-1)
-        negative_logits = PoincareDistance(query, negative_keys, 0.05).unsqueeze(-1)
+        positive_logit = -PoincareDistance(query, positive_key, 0.5).unsqueeze(-1)
+        negative_logits = -PoincareDistance(query, negative_keys, 0.5).unsqueeze(-1)
+        # positive_logit = -ps(query, positive_key).unsqueeze(-1)
+        # negative_logits = -ps(query, negative_keys).unsqueeze(-1)
         # First index in last dimension are the positive samples
         # print(f"pos : {positive_logit.shape}  neg:{negative_logits.shape}")
         logits = torch.cat([positive_logit, negative_logits], dim=1)
@@ -122,3 +123,67 @@ def mobius_add( x, y, c, dim=-1):
     num = (1 + 2 * c * xy + c * y2) * x + (1 - c * x2) * y
     denom = 1 + 2 * c * xy + c ** 2 * x2 * y2
     return num / denom.clamp_min(min_norm)
+
+
+# class PoincareDistance(nn.Module):
+#     def __int__(self):
+#         super(PoincareDistance, self).__int__()
+
+#     def forward(self, u, v):
+#         boundary = 1 - eps
+#         squnorm = th.clamp(th.sum(u * u, dim=-1), 0, boundary)
+#         sqvnorm = th.clamp(th.sum(v * v, dim=-1), 0,boundary)
+#         sqdist = th.sum(th.pow(u - v, 2), dim=-1)
+#         x = sqdist / ((1 - squnorm) * (1 - sqvnorm)) * 2 + 1
+#         # arcosh
+#         z = th.sqrt(th.pow(x, 2) - 1)
+#         return th.log(x + z)
+
+
+class TripletLoss(nn.Module):
+    '''
+    Compute normal triplet loss or soft margin triplet loss given triplets
+    '''
+    def __init__(self, margin=None):
+        super(TripletLoss, self).__init__()
+        self.margin = margin
+        if self.margin is None:  # if no margin assigned, use soft-margin
+            self.Loss = nn.SoftMarginLoss()
+        else:
+            self.Loss = nn.TripletMarginLoss(margin=margin, p=2)
+
+    def forward(self, anchor, pos, neg):
+        if self.margin is None:
+            num_samples = anchor.shape[0]
+            y = torch.ones((num_samples, 1)).view(-1)
+            if anchor.is_cuda: y = y.cuda()
+            ap_dist = torch.norm(anchor-pos, 2, dim=1).view(-1)
+            an_dist = torch.norm(anchor-neg, 2, dim=1).view(-1)
+            loss = self.Loss(an_dist - ap_dist, y)
+        else:
+            loss = self.Loss(anchor, pos, neg)
+        return loss
+
+# def triplet_loss(anc, pos, neg, margin):
+#     """
+#     Triplet Loss的损失函数
+#     """
+
+
+#     # 欧式距离
+#     pos_dist = torch.sum(torch.square(anc - pos), axis=-1, keepdims=True)
+#     neg_dist = torch.sum(torch.square(anc - neg), axis=-1, keepdims=True)
+#     basic_loss = pos_dist - neg_dist + torch.Tensor(margin).to(anc.device)
+#     print(f"TeS:{basic_loss.shape}")
+#     loss = torch.maximum(basic_loss, 0.0)
+
+#     # print "[INFO] model - triplet_loss shape: %s" % str(loss.shape)
+#     return loss
+
+def triplet_loss(anchor, positive, negative, margin):
+    pos_dist = PoincareDistance(anchor, positive, 0.5)
+    neg_dist = PoincareDistance(anchor, negative, 0.5)
+    # pos_dist = (anchor - positive).pow(2).sum(1) 
+    # neg_dist = (anchor - negative).pow(2).sum(1) 
+    loss = F.relu(pos_dist - neg_dist + margin) 
+    return loss.mean()

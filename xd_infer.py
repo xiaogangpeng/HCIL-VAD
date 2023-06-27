@@ -69,7 +69,7 @@ if __name__ == "__main__":
     if config.seed >= 0:
         util.set_seed(config.seed)
         worker_init_fn = np.random.seed(config.seed)
-    net = Model(args)
+    net = Model(args, flag="Test")
     net = net.cuda()
     test_loader = data.DataLoader(
         XDVideo(root_dir = config.root_dir, mode = 'Test', modal = config.modal, num_segments = config.num_segments, len_feature = config.len_feature),

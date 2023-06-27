@@ -3,7 +3,7 @@ import torch.nn as nn
 import random
 import numpy as np
 import torch.nn.functional as F
-from utils.InfoNCE import InfoNCE
+from utils.loss import InfoNCE
 
 def norm(data):
     l2=torch.norm(data, p = 2, dim = -1, keepdim = True)
@@ -23,6 +23,20 @@ def clas(logits, seq_len):
         instance_logits = torch.cat((instance_logits, tmp))
     instance_logits = torch.sigmoid(instance_logits)
     return instance_logits
+
+def sparsity(arr, batch_size, lamda2):
+    loss = torch.mean(torch.norm(arr, dim=0))
+    return lamda2*loss
+
+
+def smooth(arr, lamda1):
+    arr2 = torch.zeros_like(arr)
+    arr2[:-1] = arr[1:]
+    arr2[-1] = arr[-1]
+
+    loss = torch.sum((arr2-arr)**2)
+
+    return lamda1*loss
 
 
 
@@ -88,44 +102,6 @@ class HCIL(nn.Module):
             loss_a2n = self.hcil_loss(abn_rep1, abn_rep2, nor_rep)
             return loss_a2n
             
-    # def forward(self, result, _label):
-    #     loss = {}
-
-    #     _label = _label.float()
-
-    #     triplet = result["triplet_margin"]
-    #     att = result['frame']
-    #     A_att = result["A_att"]
-    #     N_att = result["N_att"]
-    #     A_Natt = result["A_Natt"]
-    #     N_Aatt = result["N_Aatt"]
-    #     kl_loss = result["kl_loss"]
-    #     distance = result["distance"]
-    #     b = _label.size(0)//2
-    #     t = att.size(1)      
-    #     anomaly = torch.topk(att, t//16 + 1, dim=-1)[0].mean(-1)
-    #     anomaly_loss = self.bce(anomaly, _label)
-
-    #     panomaly = torch.topk(1 - N_Aatt, t//16 + 1, dim=-1)[0].mean(-1)
-    #     panomaly_loss = self.bce(panomaly, torch.ones((b)).cuda())
-        
-    #     A_att = torch.topk(A_att, t//16 + 1, dim = -1)[0].mean(-1)
-    #     A_loss = self.bce(A_att, torch.ones((b)).cuda())
-
-    #     N_loss = self.bce(N_att, torch.ones_like((N_att)).cuda())    
-    #     A_Nloss = self.bce(A_Natt, torch.zeros_like((A_Natt)).cuda())
-
-    #     cost = anomaly_loss + 0.1 * (A_loss + panomaly_loss + N_loss + A_Nloss) + 0.1 * triplet + 0.001 * kl_loss + 0.0001 * distance
-
-    #     loss['total_loss'] = cost
-    #     loss['att_loss'] = anomaly_loss
-    #     loss['N_Aatt'] = panomaly_loss
-    #     loss['A_loss'] = A_loss
-    #     loss['N_loss'] = N_loss
-    #     loss['A_Nloss'] = A_Nloss
-    #     loss["triplet"] = triplet
-    #     loss['kl_loss'] = kl_loss
-    #     return cost, loss
 
 
 criterion = torch.nn.BCELoss()
@@ -157,13 +133,20 @@ def train(net, normal_loader, abnormal_loader, optimizer, criterion, wind, index
                           inputs.device
                           )
 
-    cost = mil_loss + args.lamda * hcil_loss
+    # loss_sparse = sparsity(predict['abn_score'], ainput.size(0), 8e-3)
+    # loss_smooth = smooth(predict['abn_score'], 8e-4)
 
-    # cost = mil_loss
+
+
+    # cost = mil_loss + args.lamda * hcil_loss 
+    cost = mil_loss + args.lamda * predict['triplet_loss']
     
     loss['total_loss'] = cost
     loss['mil_loss'] = mil_loss
-    loss['hcil_loss'] = hcil_loss
+    # loss['hcil_loss'] = hcil_loss
+    # loss['loss_sparse'] = loss_sparse
+    # loss['loss_smooth'] = loss_smooth
+    loss['triplet_loss'] = predict['triplet_loss']
     
     optimizer.zero_grad()
     cost.backward()

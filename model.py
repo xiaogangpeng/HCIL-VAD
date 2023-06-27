@@ -11,6 +11,11 @@ from torch.nn.modules.module import Module
 from torch import FloatTensor
 from torch.nn.parameter import Parameter
 import manifolds
+from utils.loss import TripletLoss, triplet_loss
+
+def norm(data):
+    l2 = torch.norm(data, p = 2, dim = -1, keepdim = True)
+    return torch.div(data, l2)
 
 class HypClassifier(nn.Module):
     """
@@ -20,7 +25,7 @@ class HypClassifier(nn.Module):
     def __init__(self, args):
         super(HypClassifier, self).__init__()
         # self.manifold = getattr(manifolds, args.manifold1)()
-        self.input_dim = args.gcn_hidden * 4
+        self.input_dim = args.gcn_hidden * 4 
         self.output_dim = args.num_classes
         self.use_bias = args.bias
         # if self.manifold.name == "Lorentz":         
@@ -60,10 +65,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
         self.flag=flag
         self.args = args
-        # self.manifold = getattr(manifolds, args.manifold1)()
-        # if self.manifold.name in ['Lorentz', 'Lorentzian','Hyperboloid']:
-        #     args.gcn_in_feat =  args.gcn_in_feat + 1
-
+        self.HyperCLS = HypClassifier(args)
         self.disAdj = DistanceAdj()
 
         self.conv1d1 = nn.Conv1d(in_channels=args.c_in_feat, out_channels=args.c_hidden, kernel_size=1, padding=0)
@@ -71,7 +73,7 @@ class Model(nn.Module):
 
         self.HFSGCN1 = FHyperGCN(args, args.model1, args.manifold1)
         self.HTRGCN1 = FHyperGCN(args, args.model1, args.manifold1)
-
+        
         self.HFSGCN2 = FHyperGCN(args, args.model2, args.manifold2)
         self.HTRGCN2 = FHyperGCN(args, args.model2, args.manifold2)
 
@@ -79,11 +81,11 @@ class Model(nn.Module):
         self.relu = nn.LeakyReLU()
         self.sigmoid = nn.Sigmoid()
 
-        self.HyperCLS = HypClassifier(args)
-        self.args = args
 
         self.encoder_n = nn.Sequential(nn.Linear(args.gcn_hidden*2, args.gcn_hidden*2))
         self.encoder_a = nn.Sequential(nn.Linear(args.gcn_hidden*2, args.gcn_hidden*2))
+
+        self.triplet = TripletLoss(margin=1)
 
 
 
@@ -106,6 +108,7 @@ class Model(nn.Module):
         disadj = self.disAdj(x.shape[0], x.shape[1], x.device).to(x.device)
         adj = self.adj2(x, seq_len)
         
+        
         # proj_x = self.expm(x, self.args.manifold1)
         # proj_y = self.expm(x, self.args.manifold2)
         proj_x = x
@@ -124,11 +127,15 @@ class Model(nn.Module):
         x4 = self.dropout(x4)
         out_y = torch.cat((x3, x4), 2)
 
+        # out_x = self.HFSGCN1.manifold.to_hyperboloid(out_y, self.HFSGCN1.c)
 
         o = torch.zeros_like(out_y)
         out_y = torch.cat([o[:, :, 0:1], out_y], dim=-1)
         out_y = self.HFSGCN2.manifold.lorentz_to_poincare(out_y)
+        
+        
         out = torch.cat((out_x, out_y), 2)
+
                  
         frame_prob = self.HyperCLS(out).reshape((b, n, -1)).mean(1)
         
@@ -143,6 +150,19 @@ class Model(nn.Module):
             # nor_out_aug = self.encoder_n(nor_out)
             # abn_out_aug = self.encoder_a(abn_out)
 
+
+            _, A1_index = torch.topk(abn_score, t//16 + 1, dim=-1)
+            anchor_nx = torch.gather(poin_abn_out, 1, A1_index.unsqueeze(2).expand([-1, -1, out_x.size(-1)])).mean(1).reshape(b//2,n,-1).mean(1)
+    
+            _, N_index = torch.topk(nor_score, t//16 + 1, dim=-1)
+            negative_ax =torch.gather(poin_nor_out, 1, N_index.unsqueeze(2).expand([-1, -1, out_x.size(-1)])).mean(1).reshape(b//2,n,-1).mean(1)
+
+            _, P_index = torch.topk(abn_score, t//16 + 1, dim=-1)
+            positivte_nx = torch.gather(lore_abn_out, 1, P_index.unsqueeze(2).expand([-1, -1, out_y.size(-1)])).mean(1).reshape(b//2,n,-1).mean(1)
+
+            triplet_margin_loss = triplet_loss(norm(anchor_nx), norm(positivte_nx), norm(negative_ax), 1)
+            # triplet_margin_loss = self.triplet(norm(anchor_nx), norm(positivte_nx), norm(negative_ax))
+
             return{
                 "frame": frame_prob,
                 'poin_nor_feat': poin_nor_out,
@@ -150,7 +170,8 @@ class Model(nn.Module):
                 'lore_nor_feat': lore_nor_out,
                 'lore_abn_feat': lore_abn_out,
                 'abn_score': abn_score,
-                'nor_score': nor_score
+                'nor_score': nor_score,
+                'triplet_loss': triplet_margin_loss
                 }     
         else:
              return{

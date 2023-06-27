@@ -5,7 +5,7 @@ import os
 def parse_args():
     descript = 'Pytorch Implementation of UR-DMU'
     parser = argparse.ArgumentParser(description = descript)
-    parser.add_argument('--gpu', type=int, default=0, help='number of class')
+    parser.add_argument('--cuda', type=int, default=0, help='number of class')
 
     parser.add_argument('--output_path', type = str, default = 'outputs/')
     parser.add_argument('--root_dir', type = str, default = 'outputs/')
@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument('--manifold1', default='PoincareBall', help='which manifold to use, can be any of [Euclidean, Hyperboloid, PoincareBall, Lorentz, Lorentzian]')
     parser.add_argument('--model2', default='HyboNet', help='which encoder to use, can be any of [Shallow, MLP, HNN, GCN, LGCN, HGCN, HyboNet]')
     parser.add_argument('--manifold2', default='Lorentz', help='which manifold to use, can be any of [Euclidean, Hyperboloid, PoincareBall, Lorentz, Lorentzian]')
-    parser.add_argument('--c', default=None, help='hyperbolic radius, set to None for trainable curvature')
+    parser.add_argument('--c', default=0.5, help='hyperbolic radius, set to None for trainable curvature')
     parser.add_argument('--num-layers', default=2, help='layers of hgcn')
     parser.add_argument('--act', default='relu', help='which activation function to use (or None for no activation)')
     parser.add_argument('--bias', default=1, help='whether to use bias (1) or not (0)')
@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument('--c-out-feat', type=int, default=128, help='input size of feature for HGCN (default: 2048)')
     parser.add_argument('--lamda', type=float, default=0.05, help='input size of feature for HGCN (default: 2048)')
     return init_args(parser.parse_args())
-
+ 
 
 def init_args(args):
     if not os.path.exists(args.model_path):

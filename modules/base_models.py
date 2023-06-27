@@ -23,11 +23,13 @@ class BaseModel(nn.Module):
 
         self.manifold = getattr(manifolds, self.manifold_name)()
 
-        gcn_in_feat = args.gcn_in_feat
+        in_feat = args.gcn_in_feat
+        out_feat = args.gcn_hidden
         if self.manifold.name in ['Lorentz', 'Hyperboloid']:
-            gcn_in_feat = gcn_in_feat + 1
+            in_feat = in_feat + 1
+            # out_feat = out_feat + 1
 
-        self.encoder = getattr(encoders, model)(self.c, args, manifold, gcn_in_feat)
+        self.encoder = getattr(encoders, model)(self.c, args, manifold, in_feat, out_feat)
 
 
     def encode(self, x, adj):

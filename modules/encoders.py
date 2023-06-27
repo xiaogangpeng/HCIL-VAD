@@ -28,11 +28,11 @@ class HGCN(Encoder):
     Hyperbolic-GCN.
     """
 
-    def __init__(self, c, args, manifold, gcn_in_feat):
+    def __init__(self, c, args, manifold, gcn_in_feat, gcn_out_feat):
         super(HGCN, self).__init__(c)
         self.manifold = getattr(manifolds, manifold)()
         assert args.num_layers > 1
-        dims, acts, self.curvatures = hyp_layers.get_dim_act_curv(args, gcn_in_feat)
+        dims, acts, self.curvatures = hyp_layers.get_dim_act_curv(args, gcn_in_feat, gcn_out_feat)
         self.curvatures.append(self.c)
         hgc_layers = []
         for i in range(len(dims) - 1):
@@ -59,11 +59,11 @@ class HyboNet(Encoder):
     HyboNet.
     """
 
-    def __init__(self, c, args, manifold, gcn_in_feat):
+    def __init__(self, c, args, manifold, gcn_in_feat, gcn_out_feat):
         super(HyboNet, self).__init__(c)
         self.manifold = getattr(manifolds, manifold)()
         assert args.num_layers > 1
-        dims, acts, self.curvatures = hyp_layers.get_dim_act_curv(args, gcn_in_feat)
+        dims, acts, self.curvatures = hyp_layers.get_dim_act_curv(args, gcn_in_feat, gcn_out_feat)
         self.curvatures.append(self.c)
         hgc_layers = []
         for i in range(len(dims) - 1):

@@ -21,8 +21,9 @@ if __name__ == "__main__":
     config = Config(args)
     worker_init_fn = None
     timestr = time.strftime("%Y%m%d-%H%M%S")
-    gpus = [1]
-    torch.cuda.set_device('cuda:{}'.format(gpus[0]))
+    gpu_idx = args.cuda
+    torch.cuda.set_device('cuda:{}'.format(gpu_idx))
+    args.device = 'cuda:' + str(gpu_idx) if int(gpu_idx) >= 0 else 'cpu'
     if config.seed >= 0:
         util.set_seed(config.seed)
         worker_init_fn = np.random.seed(config.seed)
@@ -71,16 +72,16 @@ if __name__ == "__main__":
 
         if (step - 1) % len(abnormal_train_loader) == 0:
             abnormal_loader_iter = iter(abnormal_train_loader)
-        train(net, normal_loader_iter,abnormal_loader_iter, optimizer, criterion, wind, step)
+        train(net, normal_loader_iter,abnormal_loader_iter, optimizer, criterion, wind, step, args)
         if step % 10 == 0 and step > 10:
             test(net, config, wind, test_loader, test_info, step)
             if test_info["auc"][-1] > best_auc:
                 best_auc = test_info["auc"][-1]
                 util.save_best_record(test_info, 
-                    os.path.join(config.output_path, "ucf_best_record_{}.txt".format(timestr)))
+                    os.path.join(config.output_path, "ucf_best_record_{}.txt".format(args.lamda)))
 
                 torch.save(net.state_dict(), os.path.join(args.model_path, \
-                    "ucf_trans_{}.pkl".format(timestr)))
+                    "ucf_trans_{}.pkl".format(args.lamda)))
             if step == config.num_iters:
                 torch.save(net.state_dict(), os.path.join(args.model_path, \
                     "ucf_trans_{}.pkl".format(step)))
